@@ -459,7 +459,9 @@ endif()
 target_include_directories(glimpse-record-test PRIVATE src)
 target_link_libraries(glimpse-record-test PRIVATE Qt6::Widgets Qt6::Multimedia)
 if(PIPEWIRE_FOUND)
-    target_sources(glimpse-record-test PRIVATE src/record/ScreenCastCapture.cpp src/record/ScreenCastCapture.h)
+    target_sources(glimpse-record-test PRIVATE
+        src/record/ScreenCastCapture.cpp src/record/ScreenCastCapture.h
+        src/app/SettingsStore.cpp src/app/SettingsStore.h)
     target_link_libraries(glimpse-record-test PRIVATE PkgConfig::PIPEWIRE Qt6::DBus)
     target_compile_definitions(glimpse-record-test PRIVATE GLIMPSE_HAVE_PIPEWIRE)
 endif()
