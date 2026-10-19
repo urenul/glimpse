@@ -1,6 +1,47 @@
-# Run by FetchContent in the kImageAnnotator source directory. The one change
-# Glimpse makes to kImageAnnotator (LGPL-3.0, see THIRD_PARTY_NOTICES.md), to
-# how it paints the canvas and the view around it: the whole view gets the
+# Run by FetchContent in the kImageAnnotator source directory. Glimpse makes
+# three changes to kImageAnnotator (LGPL-3.0, see THIRD_PARTY_NOTICES.md).
+#
+# Its exports on Windows, as for kColorPicker: see PatchExportHeader.cmake.
+set(EXPORT_HEADER include/kImageAnnotator/KImageAnnotatorExport.h)
+include(${CMAKE_CURRENT_LIST_DIR}/PatchExportHeader.cmake)
+
+# Its settings (the tools' colors, widths, fonts...) go to the file Glimpse
+# names in the application's "glimpseSettingsFile" property, Glimpse's own
+# settings file (see src/app/SettingsStore.h), instead of the default
+# QSettings, which can only be a file in a folder named after the
+# organization.
+set(_file src/backend/SettingsAdapter.h)
+file(READ ${_file} content)
+if(NOT content MATCHES "glimpseSettings")
+    string(REPLACE "	QSettings mSettings;" "	// Glimpse: the file named by the application's \"glimpseSettingsFile\"
+	// property, when it names one.
+	QSettings mSettings = glimpseSettings();
+	static QSettings glimpseSettings();" _patched "${content}")
+    if(_patched STREQUAL content)
+        message(FATAL_ERROR "PatchImageAnnotator: unexpected ${_file}")
+    endif()
+    file(WRITE ${_file} "${_patched}")
+endif()
+set(_file src/backend/SettingsAdapter.cpp)
+file(READ ${_file} content)
+if(NOT content MATCHES "glimpseSettings")
+    string(REPLACE "} // namespace kImageAnnotator" "QSettings SettingsAdapter::glimpseSettings()
+{
+	const QString file = qApp ? qApp->property(\"glimpseSettingsFile\").toString() : QString();
+	if (file.isEmpty())
+		return QSettings();
+	return QSettings(file, QSettings::IniFormat);
+}
+
+} // namespace kImageAnnotator" _patched "${content}")
+    if(_patched STREQUAL content)
+        message(FATAL_ERROR "PatchImageAnnotator: unexpected ${_file}")
+    endif()
+    file(WRITE ${_file} "#include <QCoreApplication>
+${_patched}")
+endif()
+
+# And how it paints the canvas and the view around it: the whole view gets the
 # same checkerboard as Glimpse's capture window (8 x 8 px cells, white and
 # light gray, aligned to the canvas, fixed to the screen at any zoom) instead
 # of a white view and kImageAnnotator's own 10 px checkerboard behind a

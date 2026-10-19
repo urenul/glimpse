@@ -76,11 +76,11 @@ All hotkeys can be changed in the settings.
 
 ### Settings file
 
-Glimpse keeps its settings in `Glimpse/Glimpse.ini` in its own folder, so
-a copy carries them along. The first time, it takes over the settings an
-older version kept with the system. Where its folder cannot be written (an
-installed package on Linux), the settings stay with the system: the
-registry on Windows, `~/.config/Glimpse/Glimpse.conf` on Linux.
+Glimpse keeps its settings in `config.ini` in its own folder, so a copy
+carries them along, the editor's tool colors, widths and fonts included. The first time, it takes over the settings an older version kept
+with the system or in `Glimpse/Glimpse.ini`. Where its folder cannot be
+written (an installed package on Linux), the settings stay with the system:
+the registry on Windows, `~/.config/Glimpse/Glimpse.conf` on Linux.
 
 ### Platform support
 

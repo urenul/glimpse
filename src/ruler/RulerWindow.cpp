@@ -1,5 +1,6 @@
 #include "RulerWindow.h"
 
+#include "app/SettingsStore.h"
 #include "capture/Platform.h"
 
 #include <QAction>
@@ -14,7 +15,6 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QScreen>
-#include <QSettings>
 #include <QWheelEvent>
 #include <QWindow>
 
@@ -196,7 +196,7 @@ RulerWindow::RulerWindow()
     const QScreen *screen = QGuiApplication::screenAt(QCursor::pos());
     if (!screen)
         screen = QGuiApplication::primaryScreen();
-    const QSettings settings;
+    const QSettings settings = SettingsStore::open();
     const QSize size = settings.value(kSizeKey, kDefaultSize).toSize().expandedTo(QSize(2, 2) * kThickness);
     const QPoint middle(size.width() / 2, size.height() / 2);
     const QPoint cross = settings.value(kCrossKey, middle).toPoint();
@@ -609,7 +609,7 @@ void RulerWindow::contextMenuEvent(QContextMenuEvent *event)
     (m_radians ? radians : degrees)->setChecked(true);
     connect(units, &QActionGroup::triggered, this, [this, radians](QAction *action) {
         m_radians = action == radians;
-        QSettings().setValue(kRadiansKey, m_radians);
+        SettingsStore::open().setValue(kRadiansKey, m_radians);
     });
     menu.addSeparator();
     menu.addAction(m_closeAction);
@@ -622,7 +622,7 @@ void RulerWindow::contextMenuEvent(QContextMenuEvent *event)
 // The next ruler comes the same shape.
 void RulerWindow::closeEvent(QCloseEvent *event)
 {
-    QSettings settings;
+    QSettings settings = SettingsStore::open();
     settings.setValue(kSizeKey, size());
     settings.setValue(kCrossKey, m_cross);
     QWidget::closeEvent(event);

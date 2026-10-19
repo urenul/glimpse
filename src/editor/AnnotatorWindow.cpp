@@ -2,6 +2,7 @@
 #include "ui_AnnotatorWindow.h"
 
 #include "ImageActions.h"
+#include "app/SettingsStore.h"
 
 #include <kImageAnnotator/KImageAnnotator.h>
 
@@ -10,7 +11,6 @@
 #include <QGuiApplication>
 #include <QMessageBox>
 #include <QScreen>
-#include <QSettings>
 #include <QGraphicsView>
 #include <QSpinBox>
 #include <QTimer>
@@ -33,7 +33,7 @@ AnnotatorWindow::AnnotatorWindow(const QImage &image, QWidget *parent)
     m_annotator->setTabBarAutoHide(true);
     m_annotator->setSmoothPathEnabled(true);
     // Persist each tool's color, width, font, shadow, fill, opacity... and the
-    // selected tool (kImageAnnotator stores them in our QSettings).
+    // selected tool (kImageAnnotator stores them in our settings file, see SettingsStore).
     m_annotator->setSaveToolSelection(true);
     // Edit in device pixels: every annotation lands on exact image pixels.
     // kImageAnnotator fills its canvas white, on screen and in the result. A
@@ -63,7 +63,7 @@ AnnotatorWindow::AnnotatorWindow(const QImage &image, QWidget *parent)
         m_icons.add(action);
     m_icons.apply(palette().color(QPalette::ButtonText));
     updateToolTips();
-    if (!restoreGeometry(QSettings().value(kGeometryKey).toByteArray()))
+    if (!restoreGeometry(SettingsStore::open().value(kGeometryKey).toByteArray()))
         fitToScreen();
 
     // Once shown on its screen, start at one image pixel per device pixel.
@@ -164,7 +164,7 @@ void AnnotatorWindow::closeEvent(QCloseEvent *event)
             emit finished(editedImage());
         }
     }
-    QSettings().setValue(kGeometryKey, saveGeometry());
+    SettingsStore::open().setValue(kGeometryKey, saveGeometry());
     event->accept();
 }
 

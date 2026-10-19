@@ -31,9 +31,16 @@ set(BUILD_SHARED_LIBS ON)
 FetchContent_Declare(kColorPicker-Qt6
     URL https://github.com/ksnip/kColorPicker/archive/refs/tags/v0.3.1.tar.gz
     URL_HASH SHA256=e78c785ec4a8a22a48a91835c97601f5704b5076b154415353b0d2697dc0b4f7
+    # Exports for Windows, see the script. The revision makes existing build
+    # trees fetch and patch it afresh.
+    PATCH_COMMAND ${CMAKE_COMMAND} -DGLIMPSE_PATCH_REVISION=1
+        -DEXPORT_HEADER=include/kColorPicker/KColorPickerExport.h -P "${CMAKE_CURRENT_LIST_DIR}/PatchExportHeader.cmake"
     OVERRIDE_FIND_PACKAGE
 )
 FetchContent_MakeAvailable(kColorPicker-Qt6)
+# What its export header looks for; its own CMakeLists defines
+# KIMAGEANNOTATOR_LIB instead.
+target_compile_definitions(kColorPicker PRIVATE KCOLORPICKER_LIB)
 # Only an installed kColorPicker defines this namespaced name.
 file(WRITE "${CMAKE_FIND_PACKAGE_REDIRECTS_DIR}/kcolorpicker-qt6-extra.cmake" "
 if(NOT TARGET kColorPicker::kColorPicker)
@@ -44,9 +51,10 @@ endif()
 FetchContent_Declare(kImageAnnotator
     URL https://github.com/ksnip/kImageAnnotator/archive/refs/tags/v0.7.2.tar.gz
     URL_HASH SHA256=7eb593d975b1590a184354ef68dbc3c26479d58eaea00de461d73695176f623c
-    # Its canvas painting (checkerboard, frame of the saved area). The
-    # revision makes existing build trees fetch and patch it afresh.
-    PATCH_COMMAND ${CMAKE_COMMAND} -DGLIMPSE_PATCH_REVISION=6 -P "${CMAKE_CURRENT_LIST_DIR}/PatchImageAnnotator.cmake"
+    # Its exports, settings file and canvas painting (checkerboard, frame of
+    # the saved area). The revision makes existing build trees fetch and patch
+    # it afresh.
+    PATCH_COMMAND ${CMAKE_COMMAND} -DGLIMPSE_PATCH_REVISION=8 -P "${CMAKE_CURRENT_LIST_DIR}/PatchImageAnnotator.cmake"
 )
 FetchContent_MakeAvailable(kImageAnnotator)
 

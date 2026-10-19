@@ -1,5 +1,7 @@
 #include "UsageStats.h"
 
+#include "app/SettingsStore.h"
+
 #include <QCoreApplication>
 #include <QGuiApplication>
 #include <QJsonArray>
@@ -11,7 +13,6 @@
 #include <QNetworkRequest>
 #include <QRandomGenerator>
 #include <QScreen>
-#include <QSettings>
 #include <QSysInfo>
 #include <QUrl>
 #include <QUrlQuery>
@@ -27,7 +28,7 @@ const QString kLastVersionKey = QStringLiteral("usage/lastVersion");
 
 QString installId()
 {
-    QSettings settings;
+    QSettings settings = SettingsStore::open();
     QString id = settings.value(kIdKey).toString();
     if (id.size() != 32) {
         id = QUuid::createUuid().toString(QUuid::Id128);
@@ -105,12 +106,12 @@ bool isAvailable()
 
 bool isEnabled()
 {
-    return QSettings().value(kEnabledKey, true).toBool();
+    return SettingsStore::open().value(kEnabledKey, true).toBool();
 }
 
 void setEnabled(bool enabled)
 {
-    QSettings settings;
+    QSettings settings = SettingsStore::open();
     settings.setValue(kEnabledKey, enabled);
     // Turned off, the install is forgotten; turned on again, it is a new one.
     if (!enabled)
@@ -120,7 +121,7 @@ void setEnabled(bool enabled)
 void reportStart(const QString &updateMode)
 {
     const QString version = QStringLiteral(GLIMPSE_VERSION);
-    QSettings settings;
+    QSettings settings = SettingsStore::open();
     QString last = settings.value(kLastVersionKey).toString();
     // Glimpse before 0.4.0 did not keep its version, but it did keep settings.
     const bool firstRun = last.isEmpty() && settings.allKeys().isEmpty();

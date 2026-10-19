@@ -1,6 +1,7 @@
 #include "Updater.h"
 
 #include "UsageStats.h"
+#include "app/SettingsStore.h"
 
 #include <QApplication>
 #include <QCryptographicHash>
@@ -16,7 +17,6 @@
 #include <QProgressDialog>
 #include <QPushButton>
 #include <QSaveFile>
-#include <QSettings>
 #include <QStandardPaths>
 #include <QTemporaryFile>
 #include <QTimer>
@@ -70,7 +70,7 @@ bool Updater::canInstall()
 
 Updater::Mode Updater::mode()
 {
-    const int value = QSettings().value(kModeKey, int(Mode::Ask)).toInt();
+    const int value = SettingsStore::open().value(kModeKey, int(Mode::Ask)).toInt();
     const Mode mode = value >= 0 && value <= int(Mode::Never) ? Mode(value) : Mode::Ask;
     // Without installing, there is only offering a new version or not.
     if (!canInstall() && mode != Mode::Never)
@@ -80,7 +80,7 @@ Updater::Mode Updater::mode()
 
 void Updater::setMode(Mode mode)
 {
-    QSettings().setValue(kModeKey, int(mode));
+    SettingsStore::open().setValue(kModeKey, int(mode));
 }
 
 void Updater::setCanRestart(std::function<bool()> canRestart)

@@ -2,6 +2,7 @@
 #include "ui_CaptureToolbar.h"
 
 #include "AppSettings.h"
+#include "SettingsStore.h"
 #include "TintedIcon.h"
 #include "capture/Platform.h"
 
@@ -14,7 +15,6 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QScreen>
-#include <QSettings>
 #include <QTimer>
 #include <QToolButton>
 #include <QVariantAnimation>
@@ -123,7 +123,7 @@ CaptureToolbar::CaptureToolbar(QWidget *parent)
 
     // Wherever the user last left the bar; Qt moves it back on screen if that
     // monitor is gone. Without a saved value the window system places it.
-    restoreGeometry(QSettings().value(kGeometryKey).toByteArray());
+    restoreGeometry(SettingsStore::open().value(kGeometryKey).toByteArray());
     resize(ui->panel->size()); // saved while slid in, it was a strip
     keepOnScreen();            // at the size the settings ask for
     restoreDock();
@@ -349,7 +349,7 @@ void CaptureToolbar::hideEvent(QHideEvent *event)
 
 void CaptureToolbar::savePosition()
 {
-    QSettings settings;
+    QSettings settings = SettingsStore::open();
     settings.setValue(kGeometryKey, saveGeometry());
     if (m_dockEdge != DockEdge::None && m_dockScreen) {
         settings.setValue(kDockEdgeKey, int(m_dockEdge));
@@ -488,7 +488,7 @@ void CaptureToolbar::restoreDock()
 {
     if (!dockingSupported())
         return;
-    QSettings settings;
+    QSettings settings = SettingsStore::open();
     const int edge = settings.value(kDockEdgeKey, 0).toInt();
     if (edge <= int(DockEdge::None) || edge > int(DockEdge::Bottom))
         return;

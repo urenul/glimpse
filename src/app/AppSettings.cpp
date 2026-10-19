@@ -1,12 +1,10 @@
 #include "AppSettings.h"
+#include "SettingsStore.h"
 
 #include "ocr/OcrEngine.h"
 
 #include <QCoreApplication>
 #include <QDir>
-#include <QFile>
-#include <QFileInfo>
-#include <QSettings>
 
 #include "translate/LocalModel.h"
 #include "translate/Translator.h"
@@ -37,41 +35,6 @@ QString hotkeySettingsKey(CaptureMode mode)
 } // namespace
 
 namespace AppSettings {
-
-void useProgramFolder()
-{
-    // Where QSettings puts an INI file for the user scope under `dir`.
-    const QString dir = QCoreApplication::applicationDirPath();
-    const QString file = QDir(dir).filePath(QCoreApplication::organizationName() + QLatin1Char('/')
-                                            + QCoreApplication::applicationName() + QStringLiteral(".ini"));
-    const bool existed = QFileInfo::exists(file);
-    if (existed) {
-        if (!QFileInfo(file).isWritable())
-            return;
-    } else {
-        // Can the folder take it? Tried by making the (empty) file.
-        const QString folder = QFileInfo(file).path();
-        const bool madeFolder = !QFileInfo::exists(folder);
-        QFile probe(file);
-        if (!QDir().mkpath(folder) || !probe.open(QIODevice::WriteOnly)) {
-            if (madeFolder)
-                QDir().rmdir(folder);
-            return;
-        }
-    }
-
-    const QSettings system; // still the system's: the default changes below
-    QSettings::setPath(QSettings::IniFormat, QSettings::UserScope, dir);
-    QSettings::setDefaultFormat(QSettings::IniFormat);
-    // The first time, everything set so far comes along; the system's copy
-    // stays, for an older Glimpse.
-    if (!existed) {
-        QSettings settings;
-        const QStringList keys = system.allKeys();
-        for (const QString &key : keys)
-            settings.setValue(key, system.value(key));
-    }
-}
 
 // Ctrl+Alt+1..9: reachable with the left hand alone, and
 // clear of common global hotkeys (WeChat Ctrl+Alt+W, QQ Ctrl+Alt+A/Z/O) and of
@@ -113,7 +76,7 @@ QList<ToolbarItem> defaultToolbarItems()
 
 QList<ToolbarItem> toolbarItems()
 {
-    const QSettings settings;
+    const QSettings settings = SettingsStore::open();
     const QStringList order = settings.value(QStringLiteral("toolbar/order")).toStringList();
     const QStringList hidden = settings.value(QStringLiteral("toolbar/hidden")).toStringList();
     const QList<ToolbarItem> defaults = defaultToolbarItems();
@@ -145,14 +108,14 @@ void setToolbarItems(const QList<ToolbarItem> &items)
         if (!item.visible)
             hidden << item.id;
     }
-    QSettings settings;
+    QSettings settings = SettingsStore::open();
     settings.setValue(QStringLiteral("toolbar/order"), order);
     settings.setValue(QStringLiteral("toolbar/hidden"), hidden);
 }
 
 int toolbarScale()
 {
-    const QSettings settings;
+    const QSettings settings = SettingsStore::open();
     int percent = settings.value(QStringLiteral("toolbar/scale"), 0).toInt();
     if (percent == 0) // not set: an icon size chosen by Glimpse 0.2 to 0.3, or the default
         percent = qRound(settings.value(QStringLiteral("toolbar/iconSize"), 24).toInt() * 100.0 / 24);
@@ -161,7 +124,7 @@ int toolbarScale()
 
 void setToolbarScale(int percent)
 {
-    QSettings settings;
+    QSettings settings = SettingsStore::open();
     settings.setValue(QStringLiteral("toolbar/scale"), std::clamp(percent, kToolbarScaleMin, kToolbarScaleMax));
     settings.remove(QStringLiteral("toolbar/iconSize"));
 }
@@ -174,7 +137,7 @@ int toolbarIconSize()
 QKeySequence hotkey(CaptureMode mode)
 {
     // Stored as portable text; a missing key means "default", an empty string "disabled".
-    const QVariant value = QSettings().value(hotkeySettingsKey(mode));
+    const QVariant value = SettingsStore::open().value(hotkeySettingsKey(mode));
     if (!value.isValid())
         return defaultHotkey(mode);
     return QKeySequence::fromString(value.toString(), QKeySequence::PortableText);
@@ -184,7 +147,7 @@ void setHotkey(CaptureMode mode, const QKeySequence &key)
 {
     // Only deviations are stored, so a key left at its default follows future
     // changes of the default.
-    QSettings settings;
+    QSettings settings = SettingsStore::open();
     if (key == defaultHotkey(mode))
         settings.remove(hotkeySettingsKey(mode));
     else
@@ -193,63 +156,63 @@ void setHotkey(CaptureMode mode, const QKeySequence &key)
 
 QString language()
 {
-    return QSettings().value(QStringLiteral("ui/language")).toString();
+    return SettingsStore::open().value(QStringLiteral("ui/language")).toString();
 }
 
 void setLanguage(const QString &code)
 {
-    QSettings().setValue(QStringLiteral("ui/language"), code);
+    SettingsStore::open().setValue(QStringLiteral("ui/language"), code);
 }
 
 bool captureIncludesToolbar()
 {
-    return QSettings().value(QStringLiteral("capture/includeToolbar"), false).toBool();
+    return SettingsStore::open().value(QStringLiteral("capture/includeToolbar"), false).toBool();
 }
 
 void setCaptureIncludesToolbar(bool include)
 {
-    QSettings().setValue(QStringLiteral("capture/includeToolbar"), include);
+    SettingsStore::open().setValue(QStringLiteral("capture/includeToolbar"), include);
 }
 
 bool captureIncludesCursor()
 {
-    return QSettings().value(QStringLiteral("capture/includeCursor"), false).toBool();
+    return SettingsStore::open().value(QStringLiteral("capture/includeCursor"), false).toBool();
 }
 
 void setCaptureIncludesCursor(bool include)
 {
-    QSettings().setValue(QStringLiteral("capture/includeCursor"), include);
+    SettingsStore::open().setValue(QStringLiteral("capture/includeCursor"), include);
 }
 
 bool copyCapturesToClipboard()
 {
-    return QSettings().value(QStringLiteral("capture/copyToClipboard"), false).toBool();
+    return SettingsStore::open().value(QStringLiteral("capture/copyToClipboard"), false).toBool();
 }
 
 void setCopyCapturesToClipboard(bool copy)
 {
-    QSettings().setValue(QStringLiteral("capture/copyToClipboard"), copy);
+    SettingsStore::open().setValue(QStringLiteral("capture/copyToClipboard"), copy);
 }
 
 bool freehandTransparent()
 {
-    return QSettings().value(QStringLiteral("capture/freehandTransparent"), true).toBool();
+    return SettingsStore::open().value(QStringLiteral("capture/freehandTransparent"), true).toBool();
 }
 
 void setFreehandTransparent(bool transparent)
 {
-    QSettings().setValue(QStringLiteral("capture/freehandTransparent"), transparent);
+    SettingsStore::open().setValue(QStringLiteral("capture/freehandTransparent"), transparent);
 }
 
 QColor freehandColor()
 {
-    const QColor color(QSettings().value(QStringLiteral("capture/freehandColor")).toString());
+    const QColor color(SettingsStore::open().value(QStringLiteral("capture/freehandColor")).toString());
     return color.isValid() ? color : QColor(Qt::white);
 }
 
 void setFreehandColor(const QColor &color)
 {
-    QSettings().setValue(QStringLiteral("capture/freehandColor"), color.name(QColor::HexRgb));
+    SettingsStore::open().setValue(QStringLiteral("capture/freehandColor"), color.name(QColor::HexRgb));
 }
 
 QColor freehandFill()
@@ -259,42 +222,42 @@ QColor freehandFill()
 
 bool recordHighlightCursor()
 {
-    return QSettings().value(QStringLiteral("recording/highlightCursor"), true).toBool();
+    return SettingsStore::open().value(QStringLiteral("recording/highlightCursor"), true).toBool();
 }
 
 void setRecordHighlightCursor(bool on)
 {
-    QSettings().setValue(QStringLiteral("recording/highlightCursor"), on);
+    SettingsStore::open().setValue(QStringLiteral("recording/highlightCursor"), on);
 }
 
 bool recordShowClicks()
 {
-    return QSettings().value(QStringLiteral("recording/showClicks"), true).toBool();
+    return SettingsStore::open().value(QStringLiteral("recording/showClicks"), true).toBool();
 }
 
 void setRecordShowClicks(bool on)
 {
-    QSettings().setValue(QStringLiteral("recording/showClicks"), on);
+    SettingsStore::open().setValue(QStringLiteral("recording/showClicks"), on);
 }
 
 bool recordShowKeys()
 {
-    return QSettings().value(QStringLiteral("recording/showKeys"), false).toBool();
+    return SettingsStore::open().value(QStringLiteral("recording/showKeys"), false).toBool();
 }
 
 void setRecordShowKeys(bool on)
 {
-    QSettings().setValue(QStringLiteral("recording/showKeys"), on);
+    SettingsStore::open().setValue(QStringLiteral("recording/showKeys"), on);
 }
 
 int recordKeyStyle()
 {
-    return std::clamp(QSettings().value(QStringLiteral("recording/keyStyle"), 1).toInt(), 0, 2);
+    return std::clamp(SettingsStore::open().value(QStringLiteral("recording/keyStyle"), 1).toInt(), 0, 2);
 }
 
 void setRecordKeyStyle(int style)
 {
-    QSettings().setValue(QStringLiteral("recording/keyStyle"), style);
+    SettingsStore::open().setValue(QStringLiteral("recording/keyStyle"), style);
 }
 
 QList<int> recordFrameRates()
@@ -304,23 +267,23 @@ QList<int> recordFrameRates()
 
 int recordFrameRate()
 {
-    const int rate = QSettings().value(QStringLiteral("recording/frameRate"), 30).toInt();
+    const int rate = SettingsStore::open().value(QStringLiteral("recording/frameRate"), 30).toInt();
     return recordFrameRates().contains(rate) ? rate : 30;
 }
 
 void setRecordFrameRate(int rate)
 {
-    QSettings().setValue(QStringLiteral("recording/frameRate"), rate);
+    SettingsStore::open().setValue(QStringLiteral("recording/frameRate"), rate);
 }
 
 bool recordFullColor()
 {
-    return QSettings().value(QStringLiteral("recording/fullColor"), false).toBool();
+    return SettingsStore::open().value(QStringLiteral("recording/fullColor"), false).toBool();
 }
 
 void setRecordFullColor(bool on)
 {
-    QSettings().setValue(QStringLiteral("recording/fullColor"), on);
+    SettingsStore::open().setValue(QStringLiteral("recording/fullColor"), on);
 }
 
 QString defaultSaveFolder()
@@ -330,7 +293,7 @@ QString defaultSaveFolder()
 
 QString saveFolder()
 {
-    QSettings settings;
+    QSettings settings = SettingsStore::open();
     QString folder = settings.value(QStringLiteral("general/saveFolder")).toString();
     if (folder.isEmpty()) // chosen before there was one folder for everything
         folder = settings.value(QStringLiteral("captures/saveFolder")).toString();
@@ -339,7 +302,7 @@ QString saveFolder()
 
 void setSaveFolder(const QString &folder)
 {
-    QSettings settings;
+    QSettings settings = SettingsStore::open();
     settings.remove(QStringLiteral("captures/saveFolder"));
     settings.remove(QStringLiteral("recording/folder"));
     // Only a chosen folder is stored, so the default follows the system's.
@@ -361,99 +324,99 @@ QString recordFolder(const QString &base)
 
 QString translateEngine()
 {
-    return QSettings().value(QStringLiteral("translate/engine"), Translate::defaultEngine()).toString();
+    return SettingsStore::open().value(QStringLiteral("translate/engine"), Translate::defaultEngine()).toString();
 }
 
 void setTranslateEngine(const QString &engine)
 {
-    QSettings().setValue(QStringLiteral("translate/engine"), engine);
+    SettingsStore::open().setValue(QStringLiteral("translate/engine"), engine);
 }
 
 QString translateTarget()
 {
-    const QString target = QSettings().value(QStringLiteral("translate/target")).toString();
+    const QString target = SettingsStore::open().value(QStringLiteral("translate/target")).toString();
     return Translate::targetLanguages().contains(target) ? target : Translate::defaultTarget();
 }
 
 void setTranslateTarget(const QString &target)
 {
-    QSettings().setValue(QStringLiteral("translate/target"), target);
+    SettingsStore::open().setValue(QStringLiteral("translate/target"), target);
 }
 
 QString translateKey(const QString &engine)
 {
-    return QSettings().value(QStringLiteral("translate/keys/") + engine).toString();
+    return SettingsStore::open().value(QStringLiteral("translate/keys/") + engine).toString();
 }
 
 void setTranslateKey(const QString &engine, const QString &key)
 {
     if (key.isEmpty())
-        QSettings().remove(QStringLiteral("translate/keys/") + engine);
+        SettingsStore::open().remove(QStringLiteral("translate/keys/") + engine);
     else
-        QSettings().setValue(QStringLiteral("translate/keys/") + engine, key);
+        SettingsStore::open().setValue(QStringLiteral("translate/keys/") + engine, key);
 }
 
 QString localModel()
 {
-    return QSettings().value(QStringLiteral("translate/localModel"), LocalModel::defaultPreset()).toString();
+    return SettingsStore::open().value(QStringLiteral("translate/localModel"), LocalModel::defaultPreset()).toString();
 }
 
 void setLocalModel(const QString &model)
 {
-    QSettings().setValue(QStringLiteral("translate/localModel"), model);
+    SettingsStore::open().setValue(QStringLiteral("translate/localModel"), model);
 }
 
 QString localModelFile()
 {
-    return QSettings().value(QStringLiteral("translate/localModelFile")).toString();
+    return SettingsStore::open().value(QStringLiteral("translate/localModelFile")).toString();
 }
 
 void setLocalModelFile(const QString &path)
 {
-    QSettings().setValue(QStringLiteral("translate/localModelFile"), path);
+    SettingsStore::open().setValue(QStringLiteral("translate/localModelFile"), path);
 }
 
 QString microsoftTranslatorRegion()
 {
-    return QSettings().value(QStringLiteral("translate/microsoftRegion")).toString();
+    return SettingsStore::open().value(QStringLiteral("translate/microsoftRegion")).toString();
 }
 
 void setMicrosoftTranslatorRegion(const QString &region)
 {
-    QSettings().setValue(QStringLiteral("translate/microsoftRegion"), region);
+    SettingsStore::open().setValue(QStringLiteral("translate/microsoftRegion"), region);
 }
 
 int captureDelay()
 {
-    return std::clamp(QSettings().value(QStringLiteral("capture/delay"), 0).toInt(), 0, 60);
+    return std::clamp(SettingsStore::open().value(QStringLiteral("capture/delay"), 0).toInt(), 0, 60);
 }
 
 void setCaptureDelay(int seconds)
 {
-    QSettings().setValue(QStringLiteral("capture/delay"), std::clamp(seconds, 0, 60));
+    SettingsStore::open().setValue(QStringLiteral("capture/delay"), std::clamp(seconds, 0, 60));
 }
 
 QString ocrEngine()
 {
     // A stored engine may be missing from this build; fall back to the default.
-    const QString engine = QSettings().value(QStringLiteral("ocr/engine")).toString();
+    const QString engine = SettingsStore::open().value(QStringLiteral("ocr/engine")).toString();
     return Ocr::engineIds().contains(engine) ? engine : Ocr::defaultEngine();
 }
 
 void setOcrEngine(const QString &engine)
 {
-    QSettings().setValue(QStringLiteral("ocr/engine"), engine);
+    SettingsStore::open().setValue(QStringLiteral("ocr/engine"), engine);
 }
 
 QStringList ocrLanguages()
 {
-    const QVariant value = QSettings().value(QStringLiteral("ocr/languages"));
+    const QVariant value = SettingsStore::open().value(QStringLiteral("ocr/languages"));
     return value.isValid() ? value.toStringList() : Ocr::defaultLanguages();
 }
 
 void setOcrLanguages(const QStringList &languages)
 {
-    QSettings().setValue(QStringLiteral("ocr/languages"), languages);
+    SettingsStore::open().setValue(QStringLiteral("ocr/languages"), languages);
 }
 
 } // namespace AppSettings

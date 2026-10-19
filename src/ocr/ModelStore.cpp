@@ -1,5 +1,7 @@
 #include "ModelStore.h"
 
+#include "app/SettingsStore.h"
+
 #include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDir>
@@ -10,7 +12,6 @@
 #include <QNetworkReply>
 #include <QProgressDialog>
 #include <QSaveFile>
-#include <QSettings>
 #include <QStandardPaths>
 
 namespace ModelStore {
@@ -73,13 +74,13 @@ QString directory(const QString &engine)
 
 SourceOrder sourceOrder()
 {
-    const int order = QSettings().value(kOrderKey, int(SourceOrder::MirrorFirst)).toInt();
+    const int order = SettingsStore::open().value(kOrderKey, int(SourceOrder::MirrorFirst)).toInt();
     return order >= 0 && order <= int(SourceOrder::OfficialOnly) ? SourceOrder(order) : SourceOrder::MirrorFirst;
 }
 
 void setSourceOrder(SourceOrder order)
 {
-    QSettings().setValue(kOrderKey, int(order));
+    SettingsStore::open().setValue(kOrderKey, int(order));
 }
 
 QString defaultMirror()
@@ -89,13 +90,13 @@ QString defaultMirror()
 
 QString mirror()
 {
-    return QSettings().value(kMirrorKey, defaultMirror()).toString().trimmed();
+    return SettingsStore::open().value(kMirrorKey, defaultMirror()).toString().trimmed();
 }
 
 void setMirror(const QString &base)
 {
     // Only a deviation is stored, so the default can move with new versions.
-    QSettings settings;
+    QSettings settings = SettingsStore::open();
     const QString value = base.trimmed();
     if (value.isEmpty() || value == defaultMirror())
         settings.remove(kMirrorKey);

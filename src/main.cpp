@@ -3,6 +3,7 @@
 #include "app/Autostart.h"
 #include "app/CaptureController.h"
 #include "app/Language.h"
+#include "app/SettingsStore.h"
 #include "ocr/OcrEngine.h"
 #include "translate/FirefoxTranslation.h"
 #include "translate/LocalModel.h"
@@ -60,7 +61,7 @@ int main(int argc, char *argv[])
     QApplication::setApplicationVersion(QStringLiteral(GLIMPSE_VERSION));
     // After the application/organization names, which name the file, and
     // before anything reads a setting.
-    AppSettings::useProgramFolder();
+    SettingsStore::useProgramFolder();
     QApplication::setWindowIcon(appIcon());
 
     const QStringList args = QApplication::arguments();

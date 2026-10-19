@@ -1,5 +1,7 @@
 #include "ScreenCastCapture.h"
 
+#include "app/SettingsStore.h"
+
 #include <QDBusArgument>
 #include <QDBusConnection>
 #include <QDBusMessage>
@@ -10,7 +12,6 @@
 #include <QDBusUnixFileDescriptor>
 #include <QDBusVariant>
 #include <QRandomGenerator>
-#include <QSettings>
 
 #include <pipewire/pipewire.h>
 #include <spa/param/video/format-utils.h>
@@ -196,7 +197,7 @@ void ScreenCastCapture::onSessionCreated(const QVariantMap &results)
     // screen picked last time instead of asking again.
     if (portalProperty(QStringLiteral("version")) >= 4) {
         options.insert(QStringLiteral("persist_mode"), kPersistUntilRevoked);
-        const QString token = QSettings().value(kRestoreTokenKey).toString();
+        const QString token = SettingsStore::open().value(kRestoreTokenKey).toString();
         if (!token.isEmpty())
             options.insert(QStringLiteral("restore_token"), token);
     }
@@ -215,7 +216,7 @@ void ScreenCastCapture::onStarted(const QVariantMap &results)
     // A token works once; each start hands out the next one.
     const QString token = results.value(QStringLiteral("restore_token")).toString();
     if (!token.isEmpty())
-        QSettings().setValue(kRestoreTokenKey, token);
+        SettingsStore::open().setValue(kRestoreTokenKey, token);
 
     // streams: a(ua{sv}), the PipeWire node of each picked source.
     quint32 node = 0;

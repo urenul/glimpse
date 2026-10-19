@@ -118,6 +118,8 @@ set(CMAKE_AUTORCC ON)
 qt_add_library(glimpse_ocr STATIC
     src/app/Language.cpp
     src/app/Language.h
+    src/app/SettingsStore.cpp
+    src/app/SettingsStore.h
     src/ocr/ModelStore.cpp
     src/ocr/ModelStore.h
     src/ocr/OcrEngine.cpp
