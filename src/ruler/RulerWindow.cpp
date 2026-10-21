@@ -192,7 +192,8 @@ RulerWindow::RulerWindow()
     retranslate();
 
     // Shaped like the last one (symmetric the first time), its cross in the
-    // middle of the screen under the pointer.
+    // middle of the screen under the pointer, even if an arm then runs off
+    // the screen.
     const QScreen *screen = QGuiApplication::screenAt(QCursor::pos());
     if (!screen)
         screen = QGuiApplication::primaryScreen();
@@ -202,7 +203,6 @@ RulerWindow::RulerWindow()
     const QPoint cross = settings.value(kCrossKey, middle).toPoint();
     m_radians = settings.value(kRadiansKey, false).toBool();
     setLayout(QRect(screen->geometry().center() - cross, size), cross);
-    keepOnScreen();
 }
 
 QRect RulerWindow::horizontalArm() const
@@ -368,23 +368,6 @@ void RulerWindow::paintEvent(QPaintEvent *)
     }
 }
 
-// All of it on the screen it is on, made smaller if need be. It moves as a
-// whole, keeping its shape, even if the cross then leaves the pointer.
-void RulerWindow::keepOnScreen()
-{
-    const QScreen *screen = QGuiApplication::screenAt(geometry().center());
-    if (!screen)
-        screen = QGuiApplication::screenAt(QCursor::pos());
-    if (!screen)
-        screen = QGuiApplication::primaryScreen();
-    const QRect area = screen->geometry();
-    QRect r = geometry();
-    r.setSize(r.size().boundedTo(area.size()));
-    r.moveLeft(std::clamp(r.left(), area.left(), area.right() - r.width() + 1));
-    r.moveTop(std::clamp(r.top(), area.top(), area.bottom() - r.height() + 1));
-    setLayout(r, m_cross);
-}
-
 RulerWindow::End RulerWindow::endAt(const QPoint &pos) const
 {
     if (horizontalArm().contains(pos)) {
@@ -431,7 +414,7 @@ void RulerWindow::pollPointer()
     const QPoint global = QCursor::pos();
     const QPoint local = mapFromGlobal(global);
     const bool overArm = horizontalArm().contains(local) || verticalArm().contains(local);
-    setHovered(m_resizing != End::None || (overArm && QApplication::topLevelAt(global) == this));
+    setHovered(m_resizing != End::None || m_moving || (overArm && QApplication::topLevelAt(global) == this));
 
     const Measure m = measure();
     if (pointerAlong(m.size, m.pointer) != m_paintedPointer)
@@ -492,22 +475,29 @@ void RulerWindow::mousePressEvent(QMouseEvent *event)
     activateWindow(); // for the keys
     if (event->button() != Qt::LeftButton)
         return;
+    m_pressGlobal = event->globalPosition().toPoint();
+    m_pressGeometry = geometry();
+    m_pressCross = m_cross;
+    // Ends are dragged here rather than by the window system, which would
+    // move the cross for the left and top ends.
     m_resizing = endAt(event->position().toPoint());
-    if (m_resizing != End::None) {
-        // Done here rather than by the window system, which would move the
-        // cross for the left and top ends.
-        m_pressGlobal = event->globalPosition().toPoint();
-        m_pressGeometry = geometry();
-        m_pressCross = m_cross;
+    if (m_resizing != End::None)
         return;
-    }
-    // The window system moves the window, which also works on Wayland.
-    if (windowHandle())
+    // So is the body: Windows keeps a window it moves from leaving the
+    // screen, and the ruler may run off it. On native Wayland, where windows
+    // cannot place themselves, the window system moves it.
+    if (Platform::windowsCanPlaceThemselves())
+        m_moving = true;
+    else if (windowHandle())
         windowHandle()->startSystemMove();
 }
 
 void RulerWindow::mouseMoveEvent(QMouseEvent *event)
 {
+    if (m_moving) {
+        move(m_pressGeometry.topLeft() + event->globalPosition().toPoint() - m_pressGlobal);
+        return;
+    }
     if (m_resizing == End::None) {
         switch (endAt(event->position().toPoint())) {
         case End::Left:
@@ -552,8 +542,10 @@ void RulerWindow::mouseMoveEvent(QMouseEvent *event)
 
 void RulerWindow::mouseReleaseEvent(QMouseEvent *event)
 {
-    if (event->button() == Qt::LeftButton)
+    if (event->button() == Qt::LeftButton) {
         m_resizing = End::None;
+        m_moving = false;
+    }
 }
 
 void RulerWindow::mouseDoubleClickEvent(QMouseEvent *event)

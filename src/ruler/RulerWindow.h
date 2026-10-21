@@ -56,7 +56,6 @@ private:
     End endAt(const QPoint &pos) const;
     // Sets the window's geometry and where the arms cross within it.
     void setLayout(const QRect &geometry, const QPoint &cross);
-    void keepOnScreen();
     void pollPointer();
     void updateAngle(const Measure &m);
     void setHovered(bool hovered);
@@ -67,6 +66,7 @@ private:
     bool m_hovered = false; // the ticks and the outline show only then
     std::optional<QPoint> m_paintedPointer; // what the last paint showed
     End m_resizing = End::None;
+    bool m_moving = false; // dragged by its body, by us rather than the window system
     QPoint m_pressGlobal;
     QRect m_pressGeometry;
     QPoint m_pressCross;
