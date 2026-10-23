@@ -74,7 +74,8 @@ ScrollStitcher::Result ScrollStitcher::addFrame(const QImage &input)
         return Result::NoChange;
 
     const int h = frame.height();
-    if (m_header < 0) {
+    const bool detecting = m_header < 0;
+    if (detecting) {
         // Rows identical at the same place in both frames do not scroll.
         int top = 0;
         while (top < h && rowsEqual(sig, top, m_previousSignature, top))
@@ -104,15 +105,28 @@ ScrollStitcher::Result ScrollStitcher::addFrame(const QImage &input)
         staticTop = staticBottom = 0; // (almost) nothing moved: no sticky split to make
 
     const int shift = findShift(sig, staticTop, staticBottom);
-    if (shift <= 0)
+    if (shift == 0) {
+        // Header and footer are only known from a frame that lined up; what
+        // changed here may have been no scrolling at all (a hover effect).
+        if (detecting) {
+            m_bodyHeight += m_footer;
+            m_header = m_footer = -1;
+        }
         return Result::NoOverlap;
+    }
 
-    // Newly revealed rows are the last `shift` rows of the scrolling part.
-    appendRows(frame, h - m_footer - shift, shift);
-    m_footerRows = frame.copy(0, h - m_footer, frame.width(), m_footer);
-    m_lastShift = shift;
+    // Newly revealed rows are the last ones of the scrolling part: `shift`
+    // of them, or when Tracking, those beyond the lowest point so far.
+    m_position += shift;
+    const int revealed = m_scrolling == Scrolling::Tracking ? m_position - m_maxPosition : shift;
     m_previous = frame;
     m_previousSignature = std::move(sig);
+    m_lastShift = shift;
+    if (revealed <= 0)
+        return Result::Moved;
+    appendRows(frame, h - m_footer - revealed, revealed);
+    m_footerRows = frame.copy(0, h - m_footer, frame.width(), m_footer);
+    m_maxPosition = m_position;
     ++m_frames;
     return Result::Added;
 }
@@ -127,16 +141,32 @@ int ScrollStitcher::findShift(const Signature &next, int skipTop, int skipBottom
     // on the segments that carry content; if the overlap is blank for every
     // plausible shift, the content alone cannot tell, and the shift closest to
     // the last one (scrolling moves by a fixed number of wheel notches) is taken.
+    // When Tracking, shifts up are tried too, each right after the same shift
+    // down; frames are grabbed often, so the true shift is a near-perfect match,
+    // and no guess is made on blank overlaps (the user's steps vary).
+    const bool tracking = m_scrolling == Scrolling::Tracking;
     int bestInformative = 0;
     double bestInformativeScore = 0.0;
     int bestBlank = 0;
-    for (int shift = 1; shift <= content - kMinOverlap; ++shift) {
+    // A narrow overlap can be off by a row or two; the user can always scroll
+    // back, unlike a program that cannot tell.
+    const int minOverlap = tracking ? std::max(kMinOverlap, content / 8) : kMinOverlap;
+    // 1, 2, ... or 1, -1, 2, -2, ...: ties keep the smaller distance.
+    std::vector<int> shifts;
+    for (int distance = 1; distance <= content - minOverlap; ++distance) {
+        shifts.push_back(distance);
+        if (tracking)
+            shifts.push_back(-distance);
+    }
+    for (const int shift : shifts) {
+        const int distance = std::abs(shift);
         int compared = 0, matched = 0;   // all overlapping segments
         int dCompared = 0, dMatched = 0; // segments with content
-        // previous row first + shift + i  <->  next row first + i
-        for (int i = skipTop; i < std::min(content - shift, content - skipBottom); ++i) {
-            const size_t a = size_t(first + shift + i) * kSegments;
-            const size_t b = size_t(first + i) * kSegments;
+        // previous row first + shift + i  <->  next row first + i (down);
+        // previous row first + i  <->  next row first + distance + i (up)
+        for (int i = skipTop; i < std::min(content - distance, content - skipBottom); ++i) {
+            const size_t a = size_t(first + std::max(shift, 0) + i) * kSegments;
+            const size_t b = size_t(first + std::max(-shift, 0) + i) * kSegments;
             for (int k = 0; k < kSegments; ++k) {
                 const bool same = prev.hashes[a + k] == next.hashes[b + k];
                 ++compared;
@@ -147,7 +177,7 @@ int ScrollStitcher::findShift(const Signature &next, int skipTop, int skipBottom
                 }
             }
         }
-        if (compared < kMinOverlap * kSegments || double(matched) / compared < kMinMatch)
+        if (compared < minOverlap * kSegments || double(matched) / compared < kMinMatch)
             continue;
         if (dCompared >= kMinDistinctive) {
             const double score = double(dMatched) / dCompared;
@@ -156,11 +186,11 @@ int ScrollStitcher::findShift(const Signature &next, int skipTop, int skipBottom
                 bestInformativeScore = score;
                 bestInformative = shift;
             }
-        } else if (bestBlank == 0 || std::abs(shift - m_lastShift) < std::abs(bestBlank - m_lastShift)) {
+        } else if (!tracking && (bestBlank == 0 || std::abs(shift - m_lastShift) < std::abs(bestBlank - m_lastShift))) {
             bestBlank = shift;
         }
     }
-    if (bestInformative > 0)
+    if (bestInformative != 0)
         return bestInformative;
     return m_lastShift > 0 ? bestBlank : 0;
 }

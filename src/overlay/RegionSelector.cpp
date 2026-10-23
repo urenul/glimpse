@@ -783,6 +783,7 @@ void RegionSelector::finish(const QRect &rect)
 {
     m_pressed = false;
     m_dragging = false;
+    m_controlHeld = QGuiApplication::queryKeyboardModifiers().testFlag(Qt::ControlModifier);
     closeOverlays();
     emit selected(rect);
 }

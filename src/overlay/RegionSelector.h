@@ -52,6 +52,8 @@ public:
 
     // The drawn outline after a Freehand selection; empty in the other modes.
     QPainterPath shape() const { return m_shape; }
+    // Whether Ctrl was held when the selection was made.
+    bool controlHeld() const { return m_controlHeld; }
 
 signals:
     void selected(const QRect &logicalRect);
@@ -112,6 +114,7 @@ private:
     std::optional<Sample> m_lock; // Crosshair: the locked point
     QString m_message;            // Crosshair: feedback after copying
     QPainterPath m_shape; // Freehand: the finished outline
+    bool m_controlHeld = false;
 
     QList<CaptureTarget> m_hoverChain; // outermost window first
     qsizetype m_hoverLevel = -1;       // index into m_hoverChain

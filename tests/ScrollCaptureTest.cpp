@@ -2,8 +2,10 @@
 // owns. Shows a scroll area with a known tall image, runs ScrollCaptureSession
 // on its viewport (real wheel input, real screen grabs) and compares the
 // stitched result with the image. Moves the mouse for a few seconds.
+// --manual checks manual scrolling instead: the test moves the scroll bar
+// itself, unevenly and once back up, as a user might.
 //
-//   glimpse-scroll-test [--save <png>]
+//   glimpse-scroll-test [--manual] [--save <png>]
 
 #include "capture/ScrollCaptureSession.h"
 
@@ -20,6 +22,7 @@
 #include <cstring>
 #include <algorithm>
 #include <cstdlib>
+#include <iterator>
 
 namespace {
 
@@ -48,6 +51,7 @@ int main(int argc, char *argv[])
     const QStringList args = QApplication::arguments();
     const qsizetype saveAt = args.indexOf(QStringLiteral("--save"));
     const QString savePath = saveAt >= 0 && saveAt + 1 < args.size() ? args.at(saveAt + 1) : QString();
+    const bool manual = args.contains(QStringLiteral("--manual"));
 
     // --rect x,y,w,h: scroll-capture an arbitrary screen area (logical
     // coordinates), e.g. another application's view, and just save the result.
@@ -57,7 +61,7 @@ int main(int argc, char *argv[])
         if (parts.size() != 4)
             return 2;
         const QRect rect(parts[0].toInt(), parts[1].toInt(), parts[2].toInt(), parts[3].toInt());
-        auto *session = new ScrollCaptureSession(rect, &app);
+        auto *session = new ScrollCaptureSession(rect, ScrollCaptureSession::Scrolling::Automatic, &app);
         QObject::connect(session, &ScrollCaptureSession::finished, &app, [&](const QImage &image) {
             if (!savePath.isEmpty())
                 image.save(savePath);
@@ -99,7 +103,9 @@ int main(int argc, char *argv[])
     QTimer::singleShot(800, &window, [&] {
         // Capture the viewport only (not the scroll bar), as a user would pick it.
         const QRect viewport(area.viewport()->mapToGlobal(QPoint(0, 0)), area.viewport()->size());
-        auto *session = new ScrollCaptureSession(viewport, &app);
+        auto *session = new ScrollCaptureSession(
+            viewport, manual ? ScrollCaptureSession::Scrolling::Manual : ScrollCaptureSession::Scrolling::Automatic,
+            &app);
         QObject::connect(session, &ScrollCaptureSession::finished, &app, [&](const QImage &image) {
             if (!savePath.isEmpty())
                 image.save(savePath);
@@ -146,6 +152,23 @@ int main(int argc, char *argv[])
             QApplication::quit();
         });
         session->start();
+        if (!manual)
+            return;
+        // Steps no larger than the view minus some overlap, slower than the
+        // session grabs, and one back up. Even, so that at 150% scaling they
+        // move whole device pixels, as applications scroll.
+        auto *scroller = new QTimer(session);
+        QObject::connect(scroller, &QTimer::timeout, session, [&area, session, scroller, step = 0]() mutable {
+            static constexpr int kSteps[] = {38, 120, 10, 150, 64, -150, 90, 150, 2, 140};
+            QScrollBar *bar = area.verticalScrollBar();
+            if (bar->value() == bar->maximum()) {
+                scroller->stop();
+                QTimer::singleShot(600, session, &ScrollCaptureSession::stop);
+                return;
+            }
+            bar->setValue(bar->value() + kSteps[step++ % std::size(kSteps)]);
+        });
+        QTimer::singleShot(900, scroller, [scroller] { scroller->start(250); });
     });
     QApplication::exec();
     return exitCode;

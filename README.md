@@ -11,7 +11,8 @@ Homepage: <https://pages.yanlei.org/kaguya/glimpse/>
 
 - **Capture**: a window or control (click it) or a rectangle (drag it), a
   freehand region, the full screen, or a scrolling page, with an optional
-  delay. The area outside a freehand region can be filled with a color or left
+  delay. A scrolling page scrolls by itself, or, picked with Ctrl held, as
+  you scroll it. The area outside a freehand region can be filled with a color or left
   transparent.
 - **Pin to the screen**: keep a captured region floating on top of all
   windows, right where it was taken; drag, zoom and fade it.

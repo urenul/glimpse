@@ -1509,6 +1509,16 @@ Download it now? It is stored on this computer and used offline from then on.</s
         <source>Scrolling capture: %1 px  ·  Esc to stop</source>
         <translation>スクロールキャプチャ：%1 ピクセル  ·  Esc で停止</translation>
     </message>
+    <message>
+        <location line="+2"/>
+        <source>Not lined up: scroll back a little  ·  Esc to stop</source>
+        <translation>つながりません：少し戻してください  ·  Esc で停止</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Scroll the area yourself: %1 px  ·  Esc to stop</source>
+        <translation>この範囲を自分でスクロール：%1 ピクセル  ·  Esc で停止</translation>
+    </message>
 </context>
 <context>
     <name>SettingsDialog</name>

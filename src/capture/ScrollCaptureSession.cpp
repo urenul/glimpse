@@ -26,6 +26,8 @@ namespace {
 constexpr int kSettleMs = 350;
 // First grab: also lets the selection overlay disappear.
 constexpr int kStartDelayMs = 400;
+// Manual scrolling: how often the area is grabbed.
+constexpr int kManualIntervalMs = 100;
 constexpr int kMaxHeight = 30000; // pixels
 constexpr int kMaxSteps = 400;
 constexpr int kMaxNotches = 15;
@@ -47,8 +49,10 @@ QWidget *makeStrip(const QRect &geometry)
 
 } // namespace
 
-ScrollCaptureSession::ScrollCaptureSession(const QRect &logicalRect, QObject *parent)
+ScrollCaptureSession::ScrollCaptureSession(const QRect &logicalRect, Scrolling scrolling, QObject *parent)
     : QObject(parent)
+    , m_scrolling(scrolling)
+    , m_stitcher(scrolling == Scrolling::Manual ? ScrollStitcher::Scrolling::Tracking : ScrollStitcher::Scrolling::Down)
 {
     m_screen = QGuiApplication::screenAt(logicalRect.center());
     if (!m_screen)
@@ -67,9 +71,13 @@ void ScrollCaptureSession::start()
         finish();
         return;
     }
-    m_restoreCursor = QCursor::pos();
     ScrollInput::escapePressed(); // forget an Esc from before (e.g. a canceled selection)
     createChrome();
+    if (m_scrolling == Scrolling::Manual) {
+        QTimer::singleShot(kStartDelayMs, this, &ScrollCaptureSession::manualStep);
+        return;
+    }
+    m_restoreCursor = QCursor::pos();
     QCursor::setPos(m_screen, m_scrollPoint);
     QTimer::singleShot(kStartDelayMs, this, &ScrollCaptureSession::step);
 }
@@ -93,7 +101,7 @@ void ScrollCaptureSession::createChrome()
     m_status = new QLabel;
     auto *stop = new QPushButton(tr("Stop"));
     stop->setFocusPolicy(Qt::NoFocus);
-    connect(stop, &QPushButton::clicked, this, [this] { m_stopRequested = true; });
+    connect(stop, &QPushButton::clicked, this, &ScrollCaptureSession::stop);
     layout->addWidget(m_status);
     layout->addWidget(stop);
     updatePanel();
@@ -124,6 +132,7 @@ void ScrollCaptureSession::createChrome()
         m_panelOverlaps = placed.intersects(m_rect);
     }
     m_panel->setGeometry(placed);
+    // Manual scrolling grabs too often to hide it each time: then it stays hidden.
     if (!m_panelOverlaps)
         m_panel->show();
 }
@@ -132,7 +141,46 @@ void ScrollCaptureSession::updatePanel()
 {
     if (!m_status)
         return;
-    m_status->setText(tr("Scrolling capture: %1 px  ·  Esc to stop").arg(m_stitcher.height()));
+    if (m_scrolling == Scrolling::Automatic)
+        m_status->setText(tr("Scrolling capture: %1 px  ·  Esc to stop").arg(m_stitcher.height()));
+    else if (m_lost)
+        m_status->setText(tr("Not lined up: scroll back a little  ·  Esc to stop"));
+    else
+        m_status->setText(tr("Scroll the area yourself: %1 px  ·  Esc to stop").arg(m_stitcher.height()));
+}
+
+void ScrollCaptureSession::manualStep()
+{
+    if (m_done)
+        return;
+    if (m_stopRequested || ScrollInput::escapePressed()) {
+        finish();
+        return;
+    }
+
+    const QRect local = m_rect.translated(-m_screen->geometry().topLeft());
+    const QImage frame = m_screen->grabWindow(0, local.x(), local.y(), local.width(), local.height()).toImage();
+    if (frame.isNull()) {
+        finish();
+        return;
+    }
+    // Unchanged frames are simply skipped. One that does not line up was
+    // scrolled too far since the last grab: scrolling back to where that one
+    // was picks up from there.
+    const ScrollStitcher::Result result = m_stitcher.addFrame(frame);
+    if (result != ScrollStitcher::Result::NoChange)
+        qCDebug(lcScroll) << "manual result" << int(result) << "(0 added, 1 moved, 3 no overlap)" << "shift"
+                          << m_stitcher.lastShift() << "height" << m_stitcher.height();
+    if (result == ScrollStitcher::Result::Added || result == ScrollStitcher::Result::Moved)
+        m_lost = false;
+    else if (result == ScrollStitcher::Result::NoOverlap)
+        m_lost = true;
+    updatePanel();
+    if (m_stitcher.height() >= kMaxHeight) {
+        finish();
+        return;
+    }
+    QTimer::singleShot(kManualIntervalMs, this, &ScrollCaptureSession::manualStep);
 }
 
 void ScrollCaptureSession::step()
@@ -166,6 +214,7 @@ void ScrollCaptureSession::step()
                       << m_stitcher.height() << "content" << m_stitcher.contentHeight();
     switch (result) {
     case ScrollStitcher::Result::Added:
+    case ScrollStitcher::Result::Moved: // only when Tracking
         m_unchanged = 0;
         m_retrying = false;
         if (m_stitcher.lastShift() > 0) {
@@ -223,5 +272,8 @@ void ScrollCaptureSession::finish()
     m_panel.reset();
     if (!m_restoreCursor.isNull())
         QCursor::setPos(m_restoreCursor);
-    emit finished(m_stitcher.image());
+    const QImage image = m_stitcher.image();
+    if (lcScroll().isDebugEnabled())
+        image.save(QDir::temp().filePath(QStringLiteral("glimpse-scroll-result.png")));
+    emit finished(image);
 }

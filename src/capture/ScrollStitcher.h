@@ -10,14 +10,26 @@
 // top and bottom (sticky headers, footers, toolbars) are detected once and
 // kept only once; in between, the vertical shift is found by matching row
 // hashes, and only the newly revealed rows are appended.
+//
+// Frames scrolled down by a program line up with the previous frame added.
+// When the user scrolls (Tracking), frames may also go back up: each is lined
+// up with the frame before it in either direction, which keeps track of where
+// the view is, and rows are appended once it passes the lowest point so far.
 class ScrollStitcher
 {
 public:
+    enum class Scrolling { Down, Tracking };
     enum class Result {
         Added,     // new rows were appended
+        Moved,     // Tracking: lined up, but showed nothing new
         NoChange,  // identical to the previous frame: the end was reached
         NoOverlap, // scrolled too far to line up; the frame was ignored
     };
+
+    explicit ScrollStitcher(Scrolling scrolling = Scrolling::Down)
+        : m_scrolling(scrolling)
+    {
+    }
 
     Result addFrame(const QImage &frame);
 
@@ -45,15 +57,19 @@ private:
     bool rowsEqual(const Signature &a, int rowA, const Signature &b, int rowB) const;
     // skipTop / skipBottom: rows at the edges of the scrolling part that the
     // new frame shows unchanged in place (an element that turned sticky).
+    // Negative when Tracking found the view scrolled up; 0 if none lines up.
     int findShift(const Signature &next, int skipTop, int skipBottom) const;
     void appendRows(const QImage &source, int first, int count);
 
+    Scrolling m_scrolling;
     int m_frames = 0;
     QImage m_previous;
     Signature m_previousSignature;
     int m_header = -1; // static rows at the top, -1 until known
     int m_footer = -1; // static rows at the bottom
     int m_lastShift = 0;
+    int m_position = 0;    // Tracking: how far the previous frame is scrolled
+    int m_maxPosition = 0; // Tracking: the furthest it has been
 
     QImage m_body; // grows by doubling; rows [0, m_bodyHeight) are valid
     int m_bodyHeight = 0;

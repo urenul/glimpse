@@ -8,6 +8,7 @@
 #include <QPainter>
 #include <QRandomGenerator>
 
+#include <algorithm>
 #include <cstdio>
 
 namespace {
@@ -56,27 +57,32 @@ QImage frameAt(const QImage &page, int scroll)
     return frame;
 }
 
-bool runCase(const char *name, const QList<int> &steps, bool blankBand)
+// Negative steps scroll back up (Tracking only); the result covers the page
+// down to the furthest point reached.
+bool runCase(const char *name, const QList<int> &steps, bool blankBand,
+             ScrollStitcher::Scrolling scrolling = ScrollStitcher::Scrolling::Down)
 {
     const int pageHeight = 3000;
     const QImage page = makePage(pageHeight, blankBand);
-    ScrollStitcher stitcher;
+    ScrollStitcher stitcher(scrolling);
     int scroll = 0;
+    int furthest = 0;
     stitcher.addFrame(frameAt(page, scroll));
     for (int step : steps) {
-        scroll = std::min(scroll + step, pageHeight - kContent);
+        scroll = std::clamp(scroll + step, 0, pageHeight - kContent);
+        furthest = std::max(furthest, scroll);
         stitcher.addFrame(frameAt(page, scroll));
     }
     // Reaching the end: further frames are identical.
     const auto end = stitcher.addFrame(frameAt(page, scroll));
 
-    QImage expected(kWidth, kHeader + scroll + kContent + kFooter, QImage::Format_RGB32);
+    QImage expected(kWidth, kHeader + furthest + kContent + kFooter, QImage::Format_RGB32);
     {
         QPainter p(&expected);
         const QImage first = frameAt(page, 0);
         p.drawImage(0, 0, first, 0, 0, kWidth, kHeader);
-        p.drawImage(0, kHeader, page, 0, 0, kWidth, scroll + kContent);
-        p.drawImage(0, kHeader + scroll + kContent, first, 0, kHeader + kContent, kWidth, kFooter);
+        p.drawImage(0, kHeader, page, 0, 0, kWidth, furthest + kContent);
+        p.drawImage(0, kHeader + furthest + kContent, first, 0, kHeader + kContent, kWidth, kFooter);
     }
     const QImage actual = stitcher.image();
     const bool ok = actual == expected && end == ScrollStitcher::Result::NoChange;
@@ -156,6 +162,11 @@ int main(int argc, char *argv[])
                                    175, 166, 200, 210, 190}, false);
     ok &= runCase("small steps, blank band", QList<int>(60, 45), true);
     ok &= runBrowserCase();
+    // The user scrolling: uneven steps, back up and down again; -400 leaves
+    // too little overlap and is lost, until the view is back within reach.
+    ok &= runCase("tracking, up and down", {120, 77, -150, 201, 33, -300, 180, 260, 160, -60, 199, 64, 150, -400, 211,
+                                            90, 360, 170, 188, 140, 205, 120, 175, 166, 200, 210, 190},
+                  false, ScrollStitcher::Scrolling::Tracking);
     // Overshooting step: the stitcher must refuse it rather than stitch garbage.
     {
         const QImage page = makePage(3000, false);

@@ -76,7 +76,8 @@ private:
     // (after asking); false if text cannot be recognized now.
     bool prepareOcr(const QString &title, QString *engine, QStringList *languages);
     void showColorResult(const QColor &color);
-    void startScrollingCapture(const QRect &rect);
+    // manual: the user scrolls, see ScrollCaptureSession.
+    void startScrollingCapture(const QRect &rect, bool manual);
     void startRecording(const QRect &rect);
     // Runs the "delay before capture" countdown (if any), then `then`.
     void afterDelay(std::function<void()> then);

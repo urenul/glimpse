@@ -1509,6 +1509,16 @@ Download it now? It is stored on this computer and used offline from then on.</s
         <source>Scrolling capture: %1 px  ·  Esc to stop</source>
         <translation>滚动截图：%1 像素  ·  按 Esc 停止</translation>
     </message>
+    <message>
+        <location line="+2"/>
+        <source>Not lined up: scroll back a little  ·  Esc to stop</source>
+        <translation>未能对齐：请往回滚一点  ·  按 Esc 停止</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Scroll the area yourself: %1 px  ·  Esc to stop</source>
+        <translation>请自行滚动该区域：%1 像素  ·  按 Esc 停止</translation>
+    </message>
 </context>
 <context>
     <name>SettingsDialog</name>

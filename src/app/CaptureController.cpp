@@ -412,7 +412,8 @@ void CaptureController::onSnapshot(const DesktopSnapshot &snapshot)
 
     // Scrolling capture picks its area like Window / Region: hover a
     // scrollable control and click, or drag a rectangle. Where windows cannot
-    // be picked, these only drag a rectangle.
+    // be picked, these only drag a rectangle. With Ctrl held, the user then
+    // scrolls it by hand.
     const bool picksWindows = (m_mode == Mode::Window || m_mode == Mode::Scrolling || m_mode == Mode::Recording)
                               && Platform::supportsWindowPicking();
     const auto selectorMode = picksWindows                                      ? RegionSelector::Mode::Window
@@ -423,7 +424,7 @@ void CaptureController::onSnapshot(const DesktopSnapshot &snapshot)
     connect(selector, &RegionSelector::selected, this, [this, selector](const QRect &rect) {
         if (m_mode == Mode::Scrolling) {
             selector->deleteLater();
-            startScrollingCapture(rect);
+            startScrollingCapture(rect, selector->controlHeld());
             return;
         }
         if (m_mode == Mode::Recording) {
@@ -455,10 +456,11 @@ void CaptureController::onSnapshot(const DesktopSnapshot &snapshot)
     selector->start();
 }
 
-void CaptureController::startScrollingCapture(const QRect &rect)
+void CaptureController::startScrollingCapture(const QRect &rect, bool manual)
 {
     // Still "busy": the toolbar stays hidden while the live screen is grabbed.
-    auto *session = new ScrollCaptureSession(rect, this);
+    auto *session = new ScrollCaptureSession(
+        rect, manual ? ScrollCaptureSession::Scrolling::Manual : ScrollCaptureSession::Scrolling::Automatic, this);
     connect(session, &ScrollCaptureSession::finished, this, [this, session](const QImage &image) {
         session->deleteLater();
         endCapture();
