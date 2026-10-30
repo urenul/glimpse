@@ -38,7 +38,7 @@ void AboutDialog::changeEvent(QEvent *event)
 void AboutDialog::updateTexts()
 {
     const QString github = QStringLiteral(GLIMPSE_GITHUB_URL);
-    ui->titleLabel->setText(QStringLiteral("<span style=\"font-size: 16pt; font-weight: 600;\">Glimpse</span>"
+    ui->titleLabel->setText(QStringLiteral("<span style=\"font-size: 12pt; font-weight: 600;\">Glimpse</span>"
                                            "&nbsp;&nbsp;%1")
                                 .arg(tr("Version %1").arg(QStringLiteral(GLIMPSE_VERSION)).toHtmlEscaped()));
     ui->linksLabel->setText(QStringLiteral("%1: %2<br>%3: %4")
